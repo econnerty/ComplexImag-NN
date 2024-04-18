@@ -1,9 +1,25 @@
 import jax.numpy as jnp
+from scipy.integrate import solve_ivp
+import jax.numpy as jnp
 from jax import random, grad, jit, vmap
 import jax
 import numpy as np
 import matplotlib.pyplot as plt
 import optax  # Import Optax for the optimizer
+
+def lorenz(t, state, sigma=10, rho=28, beta=2.667):
+    x, y, z = state
+    dxdt = sigma * (y - x)
+    dydt = x * (rho - z) - y
+    dzdt = x * y - beta * z
+    return [dxdt, dydt, dzdt]
+
+def encode_complex(t_values, x_values, y_values, z_values):
+    x_complex = t_values + 1j * x_values
+    y_complex = t_values + 1j * y_values
+    z_complex = t_values + 1j * z_values
+    return x_complex, y_complex, z_complex
+
 
 def initialize_weights(layer_sizes, key):
     weights = []
@@ -58,35 +74,42 @@ def inference(params, X):
     predict = vmap(lambda x: forward_pass(x, params))
     return predict(X)
 
+
+t_span = [0, 25]
+t_eval = np.linspace(t_span[0], t_span[1], 1000)
+initial_state = [1.0, 1.0, 1.0]
+
+solution = solve_ivp(lorenz, t_span, initial_state, t_eval=t_eval)
+t_values = solution.t
+
+# Encoding the states with time as the real part
+X_train, Y_train, Z_train = encode_complex(t_values, solution.y[0], solution.y[1], solution.y[2])
+
+#Group the inputs
+X_train = jnp.column_stack([t_values[:-1], X_train[:-1], Y_train[:-1], Z_train[:-1]])
+Y_train = jnp.column_stack([t_values[1:], X_train[1:], Y_train[1:], Z_train[1:]])
+
+print(X_train.shape, Y_train.shape)
+
 # Set device to CPU
 jax.default_device(jax.devices('cpu')[0])
+layer_sizes = [3, 10, 10, 3]  # Input layer with 3 neurons, two hidden layers with 10 neurons each, output layer with 3 neurons
 
-# Define the layer sizes of the network
-layer_sizes = [1, 10, 1]  # Example: 1 input, two hidden layers with 10 neurons each, 1 output
-
-# Data generation for training
-X_train = jnp.linspace(0, 2 * jnp.pi, 1000)
-Y_train = jnp.exp((.01+1j) * X_train) + (.01+1j) * jnp.exp((-.01+2j) * X_train) + 2
-
-# Train the network
+# Use existing training infrastructure
 params = train_network(X_train, Y_train, layer_sizes)
 
 # Validation dataset
-X_validation = jnp.linspace(10, 12 * jnp.pi, 1000)
-Y_validation = jnp.exp((.01+1j) * X_train) + (.01+1j) * jnp.exp((-.01+2j) * X_train) + 2
-
-# Inference on the validation dataset
+X_validation = solution.y.T[:-1]
 predictions = inference(params, X_validation)
-print(params)
 
-# Plotting results for validation
-plt.figure(figsize=(8, 8))
-plt.plot(jnp.real(Y_validation), jnp.imag(Y_validation), 'ro', label='Actual')
-plt.plot(jnp.real(predictions), jnp.imag(predictions), 'bx', label='Predicted')
-plt.title('Validation: Actual vs Predicted Values on the Unit Circle')
-plt.xlabel('Real Part')
-plt.ylabel('Imaginary Part')
+# Plotting real and imaginary parts of predictions
+plt.figure(figsize=(10, 6))
+plt.plot(X_validation[:, 0], label='True X')
+plt.plot([p[0].real for p in predictions], label='Predicted X', linestyle='--')
+plt.plot([p[1].real for p in predictions], label='Predicted Y', linestyle='--')
+plt.plot([p[2].real for p in predictions], label='Predicted Z', linestyle='--')
+plt.title('Lorenz System Prediction')
+plt.xlabel('Time Steps')
+plt.ylabel('State Variables')
 plt.legend()
-plt.grid(True)
-plt.axis('equal')
 plt.show()
