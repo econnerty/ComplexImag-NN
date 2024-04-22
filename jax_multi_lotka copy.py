@@ -12,7 +12,7 @@ from ComplexExpNN import ComplexEXPNN
 
 
 # Define the layer sizes of the network
-layer_sizes = [1,3, 1]  # Example: 1 input, two hidden layers with 10 neurons each, 1 output
+layer_sizes = [1,2,2, 1]  # Example: 1 input, two hidden layers with 10 neurons each, 1 output
 #18 Params
 
 # Data generation for training
@@ -49,8 +49,8 @@ Y_test = Y_train
 #Y_train = Y_train[idx]
 
 # Train the network
-model = ComplexEXPNN(layer_sizes, real_weight_scale=0.1, jax_key=0)
-model.train(X_train, Y_train)
+model = ComplexEXPNN(layer_sizes, real_weight_scale=1.0, jax_key=0)
+model.train(X_train, Y_train,learning_rate=.0001,epochs=100)
 # Generate the video from saved plots
 
 
