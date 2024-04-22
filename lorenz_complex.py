@@ -44,7 +44,7 @@ ax.set_zlabel('Z')
 plt.show()
 
 # Define the layer sizes, adjusting to your specific needs
-layer_sizes = [2, 20, 20, 2]  # Modify based on your architectural preferences
+layer_sizes = [2, 30, 30, 2]  # Modify based on your architectural preferences
 
 # Create the neural network instance
 nn = ComplexEXPNN(layer_sizes=layer_sizes, jax_key=0)
@@ -55,7 +55,7 @@ try:
         nn.params = pickle.load(file)
 except FileNotFoundError:
     # Train the model if no parameters file exists
-    nn.train(X_train, Y_train, epochs=100, learning_rate=0.001)
+    nn.train(X_train, Y_train, epochs=250, learning_rate=0.005,batch_size=64)
     # Save the parameters after training
     with open('params.pkl', 'wb') as file:
         pickle.dump(nn.params, file)
@@ -72,8 +72,10 @@ Y_test = np.stack([complex_data_test[1:], z_data_test[1:]], axis=-1)
 X_test = (X_test - X_test.min()) / (X_test.max() - X_test.min())
 Y_test = (Y_test - Y_test.min()) / (Y_test.max() - Y_test.min())
 
+print(X_test.shape, Y_test.shape)
+
 #Run the inference
-predictions = nn.iterative_inference(X_test[0], X_test.shape[0])
+predictions = nn.inference(X_test)
 print(predictions.shape)
 
 #Plot the results

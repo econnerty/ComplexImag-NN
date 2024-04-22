@@ -81,9 +81,9 @@ class ComplexEXPNN:
         y_hat = self.forward_pass(x, weights, biases)
         return jnp.mean(jnp.abs(y_hat - y) ** 2)
 
-    def train(self, X, Y, epochs=100, learning_rate=0.001):
+    """def train(self, X, Y, epochs=100, learning_rate=0.00005):
         self.initialize_weights()
-        optimizer = optax.sgd(learning_rate,momentum=0.9)
+        optimizer = optax.adabelief(learning_rate=learning_rate)
         self.opt_state = optimizer.init(self.params)
 
         for epoch in range(epochs):
@@ -93,7 +93,28 @@ class ComplexEXPNN:
                 current_loss = self.loss(self.params, x, y)
                 losses.append(current_loss)
             print(f"Epoch {epoch+1}, Loss: {jnp.mean(jnp.array(losses))}")
-        return self.params
+        return self.params"""
+    def train(self, X, Y, epochs=100, learning_rate=0.001, batch_size=32):
+        self.initialize_weights()
+        optimizer = optax.sgd(learning_rate,momentum=0.9)
+        self.opt_state = optimizer.init(self.params)
+
+        num_batches = X.shape[0] // batch_size
+        for epoch in range(epochs):
+            perm = np.random.permutation(X.shape[0])
+            X_shuffled = X[perm]
+            Y_shuffled = Y[perm]
+            losses = []
+            for i in range(num_batches):
+                start_idx = i * batch_size
+                end_idx = start_idx + batch_size
+                x_batch = X_shuffled[start_idx:end_idx]
+                y_batch = Y_shuffled[start_idx:end_idx]
+                self.params, self.opt_state = self.update(self.params, self.opt_state, x_batch, y_batch, optimizer)
+                current_loss = self.loss(self.params, x_batch, y_batch)
+                losses.append(current_loss)
+            print(f"Epoch {epoch+1}, Loss: {jnp.mean(jnp.array(losses))}")
+            
 
     def update(self, params, opt_state, x, y, optimizer):
         grads = grad(self.loss)(params, x, y)
