@@ -12,23 +12,8 @@ class ComplexEXPNN:
         self.params = None
         self.opt_state = None
         self.key = random.PRNGKey(jax_key)  # Initialize a random key for JAX
+        self.filenames = []
 
-    """def initialize_weights(self):
-        weights = []
-        biases = []
-        for i in range(len(self.layer_sizes) - 1):
-            self.key, subkey = random.split(self.key)
-
-            real_w = random.uniform(subkey, (self.layer_sizes[i], self.layer_sizes[i+1]), minval=-1, maxval=1) * self.real_weight_scale
-            imag_w = random.uniform(subkey, (self.layer_sizes[i], self.layer_sizes[i+1]), minval=-3.0, maxval=3.0)
-            
-            weights.append((real_w, imag_w))
-            self.key, subkey = random.split(self.key)
-            real_b = random.uniform(subkey, (self.layer_sizes[i+1],), minval=-1, maxval=1) * self.real_weight_scale
-            imag_b = random.uniform(subkey, (self.layer_sizes[i+1],), minval=-3.0, maxval=3.0)
-            biases.append((real_b, imag_b))
-
-        self.params = (weights, biases)"""
     def initialize_weights(self):
         weights = []
         biases = []
@@ -64,7 +49,7 @@ class ComplexEXPNN:
             complex_weight = real + 1j * imag
             complex_bias = real_b + 1j * imag_b
             x = jnp.dot(x, complex_weight) + complex_bias
-            x = self.complex_relu(x)  # Using complex sigmoid as the activation for subsequent layers
+            x = self.complex_sigmoid(x)  # Using complex sigmoid as the activation for subsequent layers
 
         # Final layer processing
         real, imag = weights[-1]
@@ -81,19 +66,6 @@ class ComplexEXPNN:
         y_hat = self.forward_pass(x, weights, biases)
         return jnp.mean(jnp.abs(y_hat - y) ** 2)
 
-    """def train(self, X, Y, epochs=100, learning_rate=0.00005):
-        self.initialize_weights()
-        optimizer = optax.adabelief(learning_rate=learning_rate)
-        self.opt_state = optimizer.init(self.params)
-
-        for epoch in range(epochs):
-            losses = []
-            for x, y in zip(X, Y):
-                self.params, self.opt_state = self.update(self.params, self.opt_state, x, y, optimizer)
-                current_loss = self.loss(self.params, x, y)
-                losses.append(current_loss)
-            print(f"Epoch {epoch+1}, Loss: {jnp.mean(jnp.array(losses))}")
-        return self.params"""
     def train(self, X, Y, epochs=100, learning_rate=0.001, batch_size=32):
         self.initialize_weights()
         optimizer = optax.sgd(learning_rate,momentum=0.9)
@@ -114,6 +86,24 @@ class ComplexEXPNN:
                 current_loss = self.loss(self.params, x_batch, y_batch)
                 losses.append(current_loss)
             print(f"Epoch {epoch+1}, Loss: {jnp.mean(jnp.array(losses))}")
+            # Generate and save plot for this epoch
+            predictions = self.inference(X)
+
+            #Plot the results
+            fig = plt.figure()
+            ax = fig.add_subplot(111, projection='3d')
+            ax.plot(np.real(Y[:,0]), np.imag(Y[:,0]), np.real(Y[:,1]), lw=0.5, label='Actual')
+            ax.plot(np.real(predictions[:,0]), np.imag(predictions[:,0]), np.real(predictions[:,1]), lw=0.5, label='Predicted')
+            ax.set_xlabel('X')
+            ax.set_ylabel('Y')
+            ax.set_zlabel('Z')
+            plt.legend()
+            plt.grid(True)
+            filename = f'./lorenz_complex/plot_epoch_{epoch+1}.png'
+            plt.savefig(filename)  # Ensure the saved figure retains the background color
+            plt.close()
+            self.filenames.append(filename)
+        return self.filenames
             
 
     def update(self, params, opt_state, x, y, optimizer):
@@ -125,20 +115,7 @@ class ComplexEXPNN:
     def inference(self, X):
         predict = vmap(lambda x: self.forward_pass(x, *self.params))
         return predict(X)
-    
-    def iterative_inference(self, initial_input, num_steps):
-        """Generate outputs iteratively using the model's prediction as the next input."""
-        predictions = []
-        current_input = initial_input
-        for _ in range(num_steps):
-            # Predict the next step
-            next_output = self.forward_pass(current_input, *self.params)
-            # Use the predicted output as the next input
-            predictions.append(next_output)
-            current_input = next_output
-        return jnp.array(predictions)
 
-    
     @partial(jit, static_argnums=(0,))
     def complex_sigmoid(self, x):
         return 1 / (1 + jnp.exp(-x))

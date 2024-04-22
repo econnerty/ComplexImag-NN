@@ -1,3 +1,4 @@
 out/*
 real/*
-__pycache__/ComplexExpNN.cpython-311.pyc
+__pycache__/*
+lorenz_complex/*

@@ -2,6 +2,19 @@ import numpy as np
 from ComplexExpNN import ComplexEXPNN
 import matplotlib.pyplot as plt
 import pickle
+import os
+import imageio
+
+os.environ['IMAGEIO_FFMPEG_EXE']= '/opt/homebrew/bin/ffmpeg'
+
+def create_video(filenames, output_file='complex_lorenz.mp4'):
+    with imageio.get_writer(output_file, fps=8) as writer:
+        for filename in filenames:
+            image = imageio.v3.imread(filename)
+            writer.append_data(image)
+        # Keep the last frame for a bit longer
+        for _ in range(10):
+            writer.append_data(image)
 
 def generate_lorenz_data(steps, dt=0.01, sigma=10, beta=8/3, rho=28):
     xs = np.zeros(steps + 1)
@@ -43,22 +56,25 @@ ax.set_ylabel('Y')
 ax.set_zlabel('Z')
 plt.show()
 
-# Define the layer sizes, adjusting to your specific needs
-layer_sizes = [2, 30, 30, 2]  # Modify based on your architectural preferences
+#Later size
+layer_sizes = [2, 4, 4, 2] 
 
 # Create the neural network instance
 nn = ComplexEXPNN(layer_sizes=layer_sizes, jax_key=0)
 
 # Load the parameters if they exist
+filenames = []
 try:
     with open('params.pkl', 'rb') as file:
         nn.params = pickle.load(file)
 except FileNotFoundError:
     # Train the model if no parameters file exists
-    nn.train(X_train, Y_train, epochs=250, learning_rate=0.005,batch_size=64)
+    filenames = nn.train(X_train, Y_train, epochs=250, learning_rate=0.07,batch_size=64)
     # Save the parameters after training
     with open('params.pkl', 'wb') as file:
         pickle.dump(nn.params, file)
+
+create_video(filenames)
 
 # Generate the test data
 complex_data_test = xs[train_length:] + 1j * ys[train_length:]
@@ -88,6 +104,10 @@ ax.set_ylabel('Y')
 ax.set_zlabel('Z')
 plt.legend()
 plt.show()
+
+#Print the complex MSE of predictions vs actual data
+mse = np.mean(np.abs(predictions - Y_test) ** 2)
+print(f"Complex MSE (test): {mse}")
 
 
 
